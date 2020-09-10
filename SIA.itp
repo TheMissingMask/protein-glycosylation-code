@@ -1,0 +1,41 @@
+[ moleculetype ]
+;molname   exclusions
+SIA	3
+
+[ atoms ]
+ 1 Qn   1  SIA  NX1   1 -1.000
+ 2 SN2  1  SIA  SX2   2  0.000
+ 3 SN3  1  SIA  SX3   3  0.000
+ 4 P2   1  SIA  NB1   4  0.000
+ 5 P3   1  SIA  NB2   5  0.000
+ 6 VS1  1  SIA  VS1   6  0.000
+
+[ bonds ]
+; sugar ring bonds
+;
+
+[ constraints ]
+; sugar-central bonds
+;
+  1  2 1  0.35
+  2  3 1  0.32
+  1  3 1  0.36
+  2  4 1  0.34
+  3  5 1  0.29
+
+[ angles ]
+; sugar ring angles
+;
+  1  2  4  2 130  50
+  3  2  4  2  72  50
+  1  3  5  2 106  50
+  1  3  5  2 149  50
+;
+
+[ dihedrals ]
+; ring dihedrals
+
+[ exclusions ]
+
+[ virtual_sitesn ]
+ 6	1	 1  2  3
