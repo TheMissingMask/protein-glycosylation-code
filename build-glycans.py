@@ -1185,7 +1185,263 @@ elif args.glycanType=='O':
     
 # glycosaminoglycans #
 
-############### HERE ##################
+elif args.glycanType=='GAG':
+
+    if args.glycosaminoglycan in ['heparan sulphate','heparin','hs']:
+        gag='hs'
+    elif args.glycosaminoglycan in ['keratan sulphate','ks']:
+        gag='ks'
+    elif args.glycosaminoglycan in ['chondroitin sulphate','cs']:
+        gag='cs'
+    elif args.glycosaminoglycan in ['dermatan sulphate','ds']:
+        gag='ds'
+    elif args.glycosaminoglycan in ['hyaluronan','hyaluronic acid','ha']:
+        gag='ha'
+    else:
+        raise Exception('glycosaminoglycan not recognised')
+
+    pairDict={}
+    if gag=='ha':
+        core='GlcAb3GlcNAc'
+        bondToCore='b4'
+        pairDict['GlcAb3GlcNAc']=0.5
+#        pairDict['GlcA1Sb3GlcNAc']=0.05
+ #       pairDict['GlcAb3GlcNAc2S']=0.05
+  #      pairDict['GlcA1Sb3GlcNAc2S']=0.05
+   #     pairDict['GlcAb3GlcNAc3S']=0.05
+    #    pairDict['GlcA1Sb3GlcNAc3S']=0.05
+     #   pairDict['GlcAb3GlcNAc4S']=0.05
+      #  pairDict['GlcA1Sb3GlcNAc4S']=0.05
+        #
+        pairDict['GlcNAcb4GlcA']=0.5
+#        pairDict['GlcNAcb4GlcA1S']=0.05
+ #       pairDict['GlcNAc2Sb4GlcA']=0.05
+  #      pairDict['GlcNAc2Sb4GlcA1S']=0.05
+   #     pairDict['GlcNAc3Sb4GlcA']=0.05
+    #    pairDict['GlcNAc3Sb4GlcA1S']=0.05
+     #   pairDict['GlcNAc4Sb4GlcA']=0.05
+      #  pairDict['GlcNAc4Sb4GlcA1S']=0.05
+    elif gag=='cs':
+        bondToCore='b4'
+        core='GlcAb3GlcNAc'
+        #core='GlcAb3Galb3Galb4Xyl'
+        pairDict['GlcAb3GalNAc']=0.5
+        pairDict['GalNAcb4GlcA']=0.5
+    elif gag=='hs':
+        bondToCore='a4'
+        #core='GlcAb3Galb3Galb4Xyl'
+        core='GlcNAca4IdoA'
+        pairDict['GlcNAca4IdoA']=0.25
+        pairDict['GlcNAca4GlcA']=0.25
+        pairDict['IdoAa4GlcNAc']=0.25
+        pairDict['GlcAb4GlcNAc']=0.25
+    elif gag=='ks':
+        bondToCore='b4'
+        #core='Galb4GlcNAcb2Man'
+        core='GlcNAcb3Gal'
+        pairDict['GlcNAcb3Gal']=0.5
+        pairDict['Galb4GlcNAc']=0.5
+    elif gag=='ds':
+        bondToCore='a3'
+        #core='GlcAb3Galb3Galb4Xyl'
+        core='GlcNAcb3GlcA'
+        pairDict['GalNAcb4GlcA']=0.25
+        pairDict['GlcAb3GalNAc']=0.25
+        pairDict['GalNAcb4IdoA']=0.25
+        pairDict['IdoAa3GalNAc']=0.25
+
+    addingOptions={ # incorporate into the probability dictionary instead
+            'cs':{0:['GlcA1S','GlcA'],
+                1:['GalNAc2S','GalNAc3S','GalNAc'],
+                'bonds':['b3','b4'] ###########################
+                },
+            'ds':{0:['IdoA1S','IdoA'],
+                1:['GalNAc2S','GalNAc3S','GalNAc'],
+                'bonds':['b3','b4'] ###########################
+                },
+            'ks':{0:['Gal3S','Gal'],
+                1:['GlcNAc3S','GlcNAc'],
+                'bonds':['b4','b3']#########################
+                },
+            'hs':{0:['GlcA1S','GlcA'],
+                1:['GlcNAc2S','GlcNAc3S','GlcNAc4S','GlcNAc'],
+                'bonds':['b4','b4']
+                }
+        }
+
+    branch=core
+    branch=re.sub('[\)|\(]','',branch)
+    tmp=branch
+    nrRes=re.split('[a|b]\d',branch)[1]
+    rRes=re.split('[a|b]\d',branch)[0]
+    bond0=re.findall('[a|b]\d',branch)[0]
+    base=core
+    counter=0
+    newGlycans=[]
+    maxLength=random.randint(5,10)
+    while counter<=maxLength:
+        nrRes=rRes
+        for pair in pairDict.keys():
+            if re.split('[\?|a|b][\d|\?]',pair)[1]==nrRes:
+                p=pairDict[pair]
+                if p>=random.random():
+                    rRes=re.split('[\?|a|b][\d|\?]',pair)[0]
+                    bond0=re.findall('[\?|a|b][\d|\?]',pair)[0]
+                    tmp=('%s%s'%(rRes,bond0))+tmp
+                    counter+=1
+    newGlycans.append(tmp)
+    if len(newGlycans)>1:
+        glycan=re.sub(base,'',tmp)+'['+newGlycans[0]+']'+base
+    else:
+        glycan=newGlycans[0]
+    glycan=re.sub('Neu','Neu5Ac',glycan)
+    a=glycan
+    numbers=re.compile(r'([a|b]\d)')
+    f=open('glycan-%s.txt'%(args.outName),'w')
+    f.write(a)
+    f.close()
+    a=numbers.sub(r'(\1)',a)
+    a=re.sub('[\(|\)]','',a)
+
+    glycanToAdd=a
+    preBranch=glycanToAdd
+    preBranchResidues=re.split('[a|b]\d',preBranch)
+    preBranchBonds=re.findall('[a|b]\d',preBranch)
+    preBranchResidues.reverse()
+    preBranchBonds.reverse()
+
+    itpDict={
+     'atoms':[], # list of strings to print directly out into the file
+     'bonds':[],
+     'constraints':[],
+     'angles':[],
+     'dihedrals':[],
+     'virtual_sitesn':[]
+    }
+    
+    atomN=0
+    resN=0
+    newatoms=0
+    beadNumbers={}
+    for i in range(len(preBranchResidues)):
+        beadNumbers[i]=[]
+    i=0
+    k=0
+
+    for res in preBranchResidues:
+        k+=1
+        cgRes=mapDict[res]
+        resLines=linesFromFile('%s.itp'%(cgRes))
+        # atoms
+        for l in linesBetween(resLines,'[ atoms ]','['):
+            cols=l.split()
+            newLine=' %s  %s  %s  %s  %s  %s  %s\n'%(int(cols[0])+atomN,cols[1],int(cols[2])+resN,cols[3],cols[4],int(cols[5])+atomN,cols[6])
+            itpDict['atoms'].append(newLine)
+            beadNumbers[i].append(int(cols[0])+atomN) # so now we have a list of all the atom ids of that residue
+        newatoms=int(cols[0])
+        # constraints
+        for l in linesBetween(resLines,'[ constraints ]','['):
+            cols=l.split()
+            newLine=' %s  %s  %s  %s\n'%(int(cols[0])+atomN,int(cols[1])+atomN,cols[2],cols[3])
+            itpDict['constraints'].append(newLine)
+        # angles
+        for l in linesBetween(resLines,'[ angles ]','['):
+            cols=l.split()
+            newLine=' %s  %s  %s  %s  %s  %s\n'%(int(cols[0])+atomN,int(cols[1])+atomN,int(cols[2])+atomN,cols[3],cols[4],cols[5])
+            itpDict['angles'].append(newLine)
+        # virtual sites
+        for l in linesBetween(resLines,'[ virtual_sitesn ]','['):
+            cols=l.split()
+            newLine=' %s  %s  %s  %s  %s\n'%(int(cols[0])+atomN,cols[1],int(cols[2])+atomN,int(cols[3])+atomN,int(cols[4])+atomN)
+            itpDict['virtual_sitesn'].append(newLine)
+        atomN+=newatoms
+        i+=1
+        resN+=1
+        # now we need to add the bonds between the residues
+    for i in range(len(preBranchBonds)):
+        bondVS=(beadNumbers[i][-1],beadNumbers[i+1][-1])
+        bondType='%s-%s-%s'%(mapDict[preBranchResidues[i]],preBranchBonds[i],mapDict[preBranchResidues[i+1]])
+        if bondType not in bondDict.keys():
+            bondLength=bondDict['XXX-%s-XXX'%(preBranchBonds[i])]
+        else:
+            bondLength=bondDict[bondType]
+        newLine=' %s  %s  %s  %s  %s\n'%(bondVS[0],bondVS[1],2,bondLength,500)
+        itpDict['bonds'].append(newLine)
+    # now we need to add the angle
+    for i in range(len(preBranchBonds)):
+        bondVS=(beadNumbers[i][-1],beadNumbers[i+1][-1])
+        bondBeads=[beadNumbers[i][0],beadNumbers[i][1],beadNumbers[i][2],beadNumbers[i+1][0],beadNumbers[i+1][1],beadNumbers[i+1][2]]
+        bondType='%s'%(preBranchBonds[i])
+        angles=angleDict[bondType]
+        newLines=[]
+        for j in range(3):
+            newLines.append(' %s  %s  %s  %s  %s  %s\n'%(bondBeads[j],bondVS[0],bondVS[1],2,angles[j][0],angles[j][1]))
+        for j in range(3,6):
+            newLines.append(' %s  %s  %s  %s  %s  %s\n'%(bondVS[0],bondVS[1],bondBeads[j],2,angles[j][0],angles[j][1]))
+        for l in newLines:
+            itpDict['angles'].append(l)
+    coreEndAtom=atomN # this will be linked to each branch
+    coreEndRes=cgRes
+    res=preBranchResidues[0]
+    newLines=[]
+    lines=linesFromFile('%s.pdb'%(mapDict[res]))
+    for l in lines:
+        newLines.append(l)
+    u=MDAnalysis.Universe('%s.pdb'%(mapDict[res]))
+    ag=u.select_atoms('all')
+    resCoords=[]
+    k=0
+    for j in range(len(preBranchResidues[1:])):
+        k+=1
+        res=preBranchResidues[j+1]
+        v=MDAnalysis.Universe('%s.pdb'%(mapDict[res]))
+        newRes=v.select_atoms('all')
+        coords1=newRes.atoms.positions[:3]
+        coords2=newRes.atoms.positions
+
+        coords0=ag.atoms.positions[:3]
+        group=ag
+        v1=group.atoms.positions[0]-group.atoms.positions[1]
+        v1/=unit(v1)
+        newCoords=coords0+v1
+        vector=group.atoms.positions[1]-group.atoms.positions[0]
+        normalisedVector=vector/np.linalg.norm(vector)
+        newCoords=np.asarray([newCoords[0]+(5*normalisedVector),newCoords[1]+(5*normalisedVector)])
+
+        A=np.matrix(coords1[:2])
+        B=np.matrix(newCoords[:2])
+        R,t=rigidTransform(A,B)
+        A2=(R*A.T)+np.tile(t,(1,A.shape[0]))
+        A2=A2.T
+        C=np.matrix(coords2)
+        C2=(R*C.T)+np.tile(t,(1,C.shape[0]))
+        C2=C2.T
+        C2=np.asarray(C2,dtype=np.float64)
+        C2=np.around(C2,decimals=3)
+
+        resCoords=C2
+        res=preBranchResidues[j+1]
+        for i in range(len(resCoords)):
+            newLines.append('{:6s}{:5d} {:^4s}{:1s}{:3s} {:1s}{:4d}{:1s}   {:8.3f}{:8.3f}{:8.3f}{:6.2f}{:6.2f}          {:>2s}{:2s}\n'.format('ATOM',i+1,'XXX','',mapDict[res][:3],'',k,'',resCoords[i][0],resCoords[i][1],resCoords[i][2],1.00,1.00,'',''))
+
+        f=open('test.pdb','w')
+        for l in newLines:
+            f.write(l)
+        f.close()
+
+        u=MDAnalysis.Universe('test.pdb')
+        ag=u.select_atoms('resid %s'%(k))
+
+    f=open('glycan.itp','w')
+    f.write('[ moleculetype ]\nGlycan 3\n\n')
+    for k in itpDict.keys():
+        f.write('[ %s ]\n'%(k))
+        for l in itpDict[k]:
+            f.write(l)
+        f.write('\n')
+    f.close()
+
+    os.system('gmx editconf -f test.pdb -o glycan.pdb -resnr 1')
 
 # monosaccharide #
 
