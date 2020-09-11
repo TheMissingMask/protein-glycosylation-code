@@ -1,8 +1,6 @@
 #!/usr/bin/python
 
-### need to fix the bilayer thing ###
-
-# imports 
+# imports #
 
 import subprocess
 import argparse
@@ -17,8 +15,12 @@ from MDAnalysis.analysis.leaflet import LeafletFinder
 from scipy.spatial.distance import cdist
 
 
-# define stuff
+# define stuff #
+
 def unit(v):
+    
+    '''get the unit vector of v'''
+    
     x=v[0]
     y=v[1]
     z=v[2]
@@ -94,7 +96,7 @@ def findSites(prot,noncanonical=False,cull=True):
 
 def linesFromFile(fName):
 
-    '''just get the lines from a file and return them as a list'''
+    '''get the lines from a file and return them as a list'''
 
     f=open(fName,'r')
     lines=f.readlines()
@@ -142,18 +144,9 @@ def linesBetween(lines,startString,stopString):
 
     return outLines
 
-def isContact(r,ag,cutoff=4.0): ###will need this, but not sure if it's actually being used properly (or at all) in the current attempt... ### TOFIX
-
-    '''determine whether or not there are direct contacts between atoms in residue r and atomgroup ag'''
-
-    contact=False
-    for a in ag.atoms:
-        for rA in r.atoms:
-            if np.linalg.norm(a.position-rA.position)<=cutoff:
-                iscontact=True
-    return contact
-
-def isSurface(pdb):
+def isSurface(pdb,c=5.0):
+    
+    '''identify the surface-exposed residues based on cutoff c'''
 
     os.system('gmx editconf -f %s.pdb -o boxed.pdb -bt cubic -c -d 2.0'%(pdb))
     os.system('gmx solvate -cp boxed.pdb -cs wat.gro -o solvated.pdb -radius 0.24')
@@ -165,7 +158,7 @@ def isSurface(pdb):
     saDict={}
     for res in prot.residues:
         minD=np.min(cdist(res.atoms.positions,sol.atoms.positions))
-        if minD<=5.0:
+        if minD<=c:
             saDict[res.resnum]=1
         else:
             saDict[res.resnum]=0
@@ -176,8 +169,9 @@ def isSurface(pdb):
 
 
 
-# set stuff up
+# set stuff up #
 
+# there are better ways to do this -- need to edit
 aaDict={
         'ARG':'R',
         'HIS':'H',
@@ -201,6 +195,7 @@ aaDict={
         'VAL':'V'
         }
 
+# for the topology prediction
 mapDict={
         'O':0,
         'i':1,
@@ -208,27 +203,25 @@ mapDict={
         'o':3
         }
 
-# get user input
+# get user input #
 
 parser=argparse.ArgumentParser()
 parser.add_argument('-p','--prot',default='Protein',help='prefix of the itp and pdb files for the CG protein [default: Protein]')
-parser.add_argument('-t','--glycanType',default='N',help='Type of glycosylation (N-linked [N], mucin-type [O], glycosaminoglycan [GAG], monosaccharide [mono], domain-specific [D])')
+parser.add_argument('-t','--glycanType',default='N',help='Type of glycosylation (N-linked [N], mucin-type [O], glycosaminoglycan [GAG], monosaccharide [mono])')
 parser.add_argument('-nt','--nType',default='complex',help='Options are complex, hybrid, and oligomannose')
 parser.add_argument('-s','--sites',default=None,nargs='+',help='sites to be glycosylated; if not provided, they will be predicted from the sequence (providing sites is necessary for all types of glycosylation other than N-linked)')
 parser.add_argument('-o','--outName',default='glycoprotein',help='name for output files [default: glycoprotein]')
 parser.add_argument('--bilayer',action='store_true',default=False,help='is there a bilayer present in the pdb file? [default: no]')
-parser.add_argument('--viral',action='store_true',default=False,help='is the protein viral? [default: no]')
 parser.add_argument('--cull',action='store_true',default=True,help='only glycosylate one site where two are adjacent to each other? [default: yes]')
 parser.add_argument('--noncanonical',action='store_true',default=False,help='include noncanonical sequons? [default: no]')
-parser.add_argument('--glycosaminoglycan',default=None,help='Options are ...')
-parser.add_argument('--mono',default=None)
-parser.add_argument('--domain',default=None)
+parser.add_argument('--glycosaminoglycan',default=None,help='type of glycosaminoglycan to add if type is glycosaminoglycan')
+parser.add_argument('--mono',default=None,help='identify of the monosaccharide if the glycan type is a monosaccharide')
 args=parser.parse_args()
 
 
-# get the protein coordinates, topology etc.
+# get the protein coordinates, topology etc. #
 
-print('prepping to glycosylate')
+print('preparing to glycosylate')
 
 u=MDAnalysis.Universe('%s.pdb'%(args.prot))
 prot=u.select_atoms('protein')
@@ -246,6 +239,7 @@ if len(chainIDs)>1:
     siteList=sorted([int(x) for x in sites])
     sites=siteList
 
+    # for TM proteins, make sure no sites are in the TM or intracellular regions
     if args.bilayer==True:
 
         seq=[]
@@ -278,12 +272,14 @@ if len(chainIDs)>1:
             if topologyDict[site]=='i' or topologyDict[site]=='M':
                 sites.remove(site)
 
+    # make sure all sites are solvent-exposed
     saDict=isSurface(args.prot)
 
     for site in sites:
         if saDict[site]!=1:
             sites.remove(site)
 
+    # check that N-linked only on Asn and Mucin-type only on Ser or Thr
     for site in sites:
         if args.glycanType=='N':
             for res in prot.residues:
@@ -296,17 +292,15 @@ if len(chainIDs)>1:
 
     os.system('rm boxed.pdb solvated.pdb')
 
-    print('glycosylation sites are: %s'%sites)
-
     # prepare the topology file #
     outTop=open('topol-%s.top'%(chain),'w')
     outTop.write(
         '''#include "martini_v3.0.3.itp"
-        #include "Protein.itp"
+        #include "%s.itp"
         #ifdef POSRES
         #include "posre.itp"
         #endif
-    ''')
+    '''%(args.prot))
 
     for site in sites:
         outTop.write('#include "glycan-%s.itp\n'%(site))
@@ -332,12 +326,14 @@ if len(chainIDs)>1:
 
     # Onward!
 
-    print('Doing sites:\n')
+    print('the glycosites are:\n')
     print(sites)
 
     glycanbead=prot.residues[-1].atoms.ids[-1]+1
     protRes1=prot.residues.resnums[0]
 
+    # now we loop through the sites
+    
     for site in sites:
 
         print('doing site %s'%(site))
@@ -356,6 +352,8 @@ if len(chainIDs)>1:
             subprocess.Popen('python3 build-glycans.py -t %s -o glycan-%s'%(args.glycanType,site),shell=True).wait()
         elif args.glycanType=='mono':
             subprocess.Popen('python3 build-glycans.py -t %s --mono %s -o glycan-%s'%(args.glycanType,args.mono,site),shell=True).wait()
+        elif args.glycanType=='glycosaminoglycan':
+            subprocess.Popen('python3 build-glycans.py -t %s --gag %s -o glycan-%s'%(args.glycanType,args.gag,site),shell=True).wait()
 
         print('glycan-%s'%(site))
         for r in prot.residues:
@@ -392,7 +390,6 @@ if len(chainIDs)>1:
                 rSele+='%s '%(r.resnum)
         group=prot.select_atoms('resnum %s'%(rSele))
 
-#    group=prot.select_atoms('resnum %s'%(site))
         v1=group.atoms.positions[0]-group.atoms.positions[1]
         v1/=unit(v1)
         newCoords=coords0+v1#(v1*1.5) ################### AHOY
@@ -427,6 +424,13 @@ if len(chainIDs)>1:
 
         subprocess.Popen('gmx editconf -f tmp.pdb -o renumbered.pdb -resnr %s'%(protRes1),shell=True).wait()
         subprocess.Popen('mv renumbered.pdb tmp.pdb',shell=True).wait()
+        
+        # before we move onto the next site, check for steric clashes
+        siteidx=sites.index(site)
+        siteidx1=sites.index(site)+1
+        saDict=isSurface('tmp')
+        if saDict[sites[siteidx1]]!=1:
+            sites.remove(sites[siteidx1])
 
         u=MDAnalysis.Universe('tmp.pdb')
         prot=u.select_atoms('all')
@@ -446,7 +450,7 @@ else:
     siteList=sorted([int(x) for x in sites])
     sites=siteList
 
-    # if a bilayer is present, make sure we don't build glycans into the bilayer
+    # if a bilayer is present, make sure we don't add glycans to TM or intracellular regions
     if args.bilayer==True:
 
         seq=[]
@@ -479,37 +483,30 @@ else:
             if topologyDict[site]=='i' or topologyDict[site]=='M':
                 sites.remove(site)
 
-    #surface residues
-    radius=0.6
-    os.system('echo "1\n" | gmx sasa -oa -or -o -probe %s -s %s'%(radius,args.prot))
-    cutoff=0.0
-
-    f=open('resarea.xvg')
-    lines=f.readlines()
-    f.close()
-
-    surfaceRes=[]
-
-    for l in lines:
-        cols=l.split()
-        if cols[0][0] in ['@','#']:
-            next
-        else:
-            if float(cols[1])>=cutoff:
-                surfaceRes.append(int(cols[0]))
+    # ensure the sites are solvent-exposed
+    saDict=isSurface(args.prot)
 
     for site in sites:
-        if site not in surfaceRes:
+        if saDict[site]!=1:
             sites.remove(site)
 
+    # check that N-linked only on Asn and Mucin-type only on Ser or Thr
+    for site in sites:
+        if args.glycanType=='N':
+            for res in prot.residues:
+                if res.resnum==site and res.resname !='ASN':
+                    sites.remove(site)
+        elif args.glycanType=='O':
+            for res in prot.residues:
+                if res.resnum==site and res.resname not in ['SER','THR']:
+                    sites.remove(site)
 
-    print('glycosylation sites are: %s'%sites)
 
     outTop=open('topol.top','w')
     outTop.write(
     '''#include "martini_v3.0.3.itp"
-#include "Protein.itp"
-    ''')
+#include "%s.itp"
+    '''%(args.prot))
 
     for site in sites:
         outTop.write('#include "glycan-%s.itp\n'%(site))
@@ -535,7 +532,7 @@ Protein 1
 
 # Onward!
 
-    print('Doing sites:\n')
+    print('the glycosites are:\n')
     print(sites)
 
     glycanbead=prot.residues[-1].atoms.ids[-1]+1
@@ -595,8 +592,6 @@ Protein 1
         pdbCore=MDAnalysis.Universe('glycan-%s.pdb'%(site))
         agCore=pdbCore.select_atoms('all')
 
-#    addition+=len(agCore.atoms)
-
         coords1=agCore.atoms.positions[:2]
         coords2=agCore.atoms.positions
         for r in prot.residues:
@@ -614,10 +609,9 @@ Protein 1
                 rSele+='%s '%(r.resnum)
         group=prot.select_atoms('resnum %s'%(rSele))
 
-#    group=prot.select_atoms('resnum %s'%(site))
         v1=group.atoms.positions[0]-group.atoms.positions[1]
         v1/=unit(v1)
-        newCoords=coords0+v1#(v1*1.5) ################### AHOY
+        newCoords=coords0+v1
 
         vector=group.atoms.positions[1]-group.atoms.positions[0]
         normalisedVector=vector/np.linalg.norm(vector)
@@ -649,7 +643,13 @@ Protein 1
 
         subprocess.Popen('gmx editconf -f tmp.pdb -o renumbered.pdb -resnr %s'%(protRes1),shell=True).wait()
         subprocess.Popen('mv renumbered.pdb tmp.pdb',shell=True).wait()
-
+        
+        siteidx=sites.index(site)
+        siteidx1=sites.index(site)+1
+        saDict=isSurface('tmp')
+        if saDict[sites[siteidx1]]!=1:
+            sites.remove(sites[siteidx1])
+            
         u=MDAnalysis.Universe('tmp.pdb')
         prot=u.select_atoms('all')
         glycanbead=prot.residues[-1].atoms.ids[-1]+1
