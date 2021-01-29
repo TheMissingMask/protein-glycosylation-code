@@ -278,7 +278,6 @@ if len(chainIDs)>1:
     for site in sites:
         if saDict[site]!=1:
             sites.remove(site)
-
     # check that N-linked only on Asn and Mucin-type only on Ser or Thr
     for site in sites:
         if args.glycanType=='N':
@@ -449,7 +448,6 @@ else:
         sites=list(set(findSites(prot,noncanonical=args.noncanonical,cull=args.cull)))
     siteList=sorted([int(x) for x in sites])
     sites=siteList
-
     # if a bilayer is present, make sure we don't add glycans to TM or intracellular regions
     if args.bilayer==True:
 
@@ -484,7 +482,7 @@ else:
                 sites.remove(site)
 
     # ensure the sites are solvent-exposed
-    saDict=isSurface(args.prot)
+    saDict=isSurface(args.prot,c=7.0)
 
     for site in sites:
         if saDict[site]!=1:
@@ -647,8 +645,9 @@ Protein 1
         siteidx=sites.index(site)
         siteidx1=sites.index(site)+1
         saDict=isSurface('tmp')
-        if saDict[sites[siteidx1]]!=1:
-            sites.remove(sites[siteidx1])
+        if siteidx1<len(sites):
+            if saDict[sites[siteidx1]]!=1:
+                sites.remove(sites[siteidx1])
             
         u=MDAnalysis.Universe('tmp.pdb')
         prot=u.select_atoms('all')
