@@ -151,7 +151,7 @@ def isSurface(pdb,c=5.0):
     os.system('gmx editconf -f %s.pdb -o boxed.pdb -bt cubic -c -d 2.0'%(pdb))
     os.system('gmx solvate -cp boxed.pdb -cs wat.gro -o solvated.pdb -radius 0.24')
 
-    universe=MDAnalysis.Universe('solvated.pdb')
+    u=MDAnalysis.Universe('solvated.pdb')
     prot=u.select_atoms('not name W')
     sol=u.select_atoms('name W')
 
